@@ -401,5 +401,180 @@ const driveFolders = {
       if (e.ctrlKey && e.keyCode === 85) return false; // Ctrl+U
     };
   </script>
+
+  <!-- Screenshot Button -->
+  <div class="ui-buttons" style="right:80px; top:20px;">
+    <button id="screenshot-btn" title="Take Screenshot">
+      <img src="camera_icon.png" alt="Screenshot" />
+    </button>
+  </div>
+
+  <!-- Screenshot Modal -->
+  <div id="screenshot-modal" style="display:none;">
+    <div id="screenshot-backdrop"></div>
+    <div id="screenshot-window" role="dialog" aria-modal="true" aria-label="Screenshot preview">
+      <button id="screenshot-close" aria-label="Close">&times;</button>
+      <h3 style="margin:0 0 8px 0; font-family: 'Cinzel', serif;">Screenshot Preview</h3>
+      <div id="screenshot-content">
+        <img id="screenshot-img" alt="Screenshot preview" />
+      </div>
+      <div id="screenshot-actions">
+        <a id="download-link" download="tryon_screenshot.png">Download</a>
+        <button id="share-btn">Share</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Screenshot modal styles */
+    #screenshot-modal #screenshot-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 60;
+    }
+    #screenshot-window {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%,-50%);
+      background: #111;
+      color: #fff;
+      padding: 16px;
+      border-radius: 12px;
+      z-index: 61;
+      width: min(720px, 92vw);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      text-align: center;
+    }
+    #screenshot-window #screenshot-close {
+      position: absolute;
+      right: 12px;
+      top: 8px;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+    }
+    #screenshot-content {
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background: rgba(255,255,255,0.03);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    #screenshot-img {
+      max-width: 100%;
+      max-height: 60vh;
+      border-radius: 6px;
+    }
+    #screenshot-actions {
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      align-items:center;
+    }
+    #download-link, #share-btn {
+      background: #5E0F8B;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration:none;
+      border:none;
+      cursor:pointer;
+      font-weight:600;
+    }
+    #download-link:hover, #share-btn:hover { opacity: 0.9; }
+  </style>
+
+  <script>
+    // Screenshot functionality
+    const screenshotBtn = document.getElementById('screenshot-btn');
+    const modal = document.getElementById('screenshot-modal');
+    const closeBtn = document.getElementById('screenshot-close');
+    const screenshotImg = document.getElementById('screenshot-img');
+    const downloadLink = document.getElementById('download-link');
+    const shareBtn = document.getElementById('share-btn');
+
+    function dataURLToBlob(dataURL) {
+      const parts = dataURL.split(';base64,');
+      const contentType = parts[0].split(':')[1];
+      const byteString = atob(parts[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      return new Blob([ab], { type: contentType });
+    }
+
+    async function takeScreenshot() {
+      try {
+        const w = videoElement.videoWidth || canvasElement.width;
+        const h = videoElement.videoHeight || canvasElement.height;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tctx = tempCanvas.getContext('2d');
+
+        // draw current video frame
+        tctx.drawImage(videoElement, 0, 0, w, h);
+        // overlay canvas (jewelry)
+        tctx.drawImage(canvasElement, 0, 0, w, h);
+
+        const dataURL = tempCanvas.toDataURL('image/png');
+        screenshotImg.src = dataURL;
+        downloadLink.href = dataURL;
+
+        // show modal
+        modal.style.display = 'block';
+
+        // prepare blob for share
+        const blob = dataURLToBlob(dataURL);
+        shareBtn.onclick = async () => {
+          if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'tryon_screenshot.png', { type: 'image/png' })] })) {
+            try {
+              await navigator.share({
+                files: [new File([blob], 'tryon_screenshot.png', { type: 'image/png' })],
+                title: 'Try-On Screenshot',
+                text: 'Check out my try-on snapshot!'
+              });
+            } catch (err) {
+              alert('Share cancelled or failed: ' + err.message);
+            }
+          } else if (navigator.share) {
+            // fallback to share URL (not files)
+            try {
+              await navigator.share({ title: 'Try-On Screenshot', text: 'See my try-on screenshot', url: dataURL });
+            } catch (err) {
+              alert('Share cancelled or failed: ' + err.message);
+            }
+          } else {
+            // final fallback: open image in new tab and instruct user to share manually
+            const w = window.open();
+            w.document.write(`<img src="${dataURL}" alt="screenshot">`);
+          }
+        };
+      } catch (err) {
+        console.error('Screenshot failed', err);
+        alert('Could not take screenshot: ' + err.message);
+      }
+    }
+
+    screenshotBtn.addEventListener('click', async () => {
+      // ensure we have a video frame before capture
+      if (videoElement.readyState < 2) {
+        alert('Camera not ready yet. Please try again in a moment.');
+        return;
+      }
+      await takeScreenshot();
+    });
+
+    closeBtn.addEventListener('click', () => modal.style.display = 'none');
+    // also close if backdrop clicked
+    document.getElementById('screenshot-backdrop').addEventListener('click', () => modal.style.display = 'none');
+  </script>
+
 </body>
 </html>
